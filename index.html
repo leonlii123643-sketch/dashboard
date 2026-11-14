@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>项目进度看板</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #1a1d24; --card2: #22262f;
+    --text: #e6e8ec; --muted: #8a919c; --border: #2a2f3a;
+    --gold: #d4a44c; --blue: #3b82f6; --green: #22c55e; --red: #ef4444; --gray: #5a616c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; padding: 28px 20px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  header { margin-bottom: 22px; }
+  header h1 { font-size: 24px; font-weight: 700; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .summary { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+  .chip { background: var(--card); border: 1px solid var(--border); padding: 8px 14px; border-radius: 10px; font-size: 13px; color: var(--muted); }
+  .chip b { color: var(--text); font-size: 16px; margin-right: 3px; }
+  .section-title { font-size: 16px; font-weight: 700; margin: 26px 0 12px; display: flex; align-items: center; gap: 8px; }
+  .section-title::before { content: ""; width: 4px; height: 16px; background: var(--gold); border-radius: 2px; }
+  .hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .grid { display: grid; gap: 14px; }
+  .projects { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+  .agents { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; cursor: pointer; transition: border-color .2s; }
+  .card:hover { border-color: var(--gold); }
+  .card.open { border-color: var(--gold); grid-column: 1 / -1; }
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .card-title { font-size: 16px; font-weight: 700; line-height: 1.35; }
+  .card-market { color: var(--gold); font-size: 12px; margin-top: 3px; }
+  .badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+  .badge.立项 { background: rgba(212,164,76,.15); color: var(--gold); border: 1px solid rgba(212,164,76,.4); }
+  .badge.进行中 { background: rgba(59,130,246,.15); color: #60a5fa; border: 1px solid rgba(59,130,246,.4); }
+  .badge.废弃 { background: rgba(90,97,108,.15); color: var(--gray); border: 1px solid rgba(90,97,108,.4); }
+  .badge.忙碌 { background: rgba(59,130,246,.15); color: #60a5fa; border: 1px solid rgba(59,130,246,.4); }
+  .badge.待命 { background: rgba(90,97,108,.15); color: var(--gray); border: 1px solid rgba(90,97,108,.4); }
+  .progress { margin: 14px 0 6px; }
+  .progress-track { height: 8px; background: #2a2f3a; border-radius: 5px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--gold), #e6b85c); border-radius: 5px; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin-top: 5px; }
+  .note { margin-top: 10px; font-size: 12.5px; color: var(--muted); background: var(--card2); border-left: 3px solid var(--gold); padding: 8px 12px; border-radius: 6px; line-height: 1.6; }
+  .detail { display: none; margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .card.open .detail { display: block; }
+  .detail-title { font-size: 13px; font-weight: 700; color: var(--gold); margin-bottom: 10px; }
+  .tl, .hist { max-height: 360px; overflow-y: auto; }
+  .tl-item, .hist-item { padding: 9px 10px; border-radius: 8px; background: var(--card2); margin-bottom: 6px; font-size: 12.5px; line-height: 1.55; }
+  .tl-item .time, .hist-item .time { color: var(--muted); font-size: 11px; margin-right: 6px; }
+  .tl-item .who { color: var(--gold); font-weight: 600; }
+  .tl-item .txt, .hist-item .txt { color: var(--text); }
+  .hist-item .proj { color: var(--blue); font-weight: 600; }
+  .empty-detail { color: var(--muted); font-size: 12.5px; padding: 10px; }
+  .agent-head { display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3a3f4a, #22262f); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .agent-name { font-size: 15px; font-weight: 700; }
+  .agent-role { font-size: 11px; color: var(--muted); }
+  .agent-current { font-size: 13px; margin-top: 10px; color: var(--text); }
+  .agent-project { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .updated { color: var(--muted); font-size: 12px; text-align: center; margin-top: 26px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📊 项目进度看板</h1>
+    <div class="sub">公司项目总览 + 各机器人分工 · 点击卡片看详情</div>
+    <div class="summary" id="summary"></div>
+  </header>
+
+  <div class="section-title">项目总览 <span class="hint">点击展开动态时间线</span></div>
+  <div class="grid projects" id="projects"></div>
+
+  <div class="section-title">机器人分工 <span class="hint">点击展开工作记录</span></div>
+  <div class="grid agents" id="agents"></div>
+
+  <div class="updated" id="updated"></div>
+</div>
+
+<script>
+async function load() {
+  try {
+    const r = await fetch("projects.json", { cache: "no-store" });
+    const data = await r.json();
+    render(data);
+  } catch (e) {
+    document.getElementById("projects").innerHTML = `<div class="card">数据加载失败：${e.message}</div>`;
+  }
+}
+function fmtTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getMonth()+1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+function toggle(card) {
+  const wasOpen = card.classList.contains("open");
+  card.closest(".grid").querySelectorAll(".card.open").forEach(c => c.classList.remove("open"));
+  if (!wasOpen) card.classList.add("open");
+}
+function render(data) {
+  const stages = data.stages || [];
+  const projects = data.projects || [];
+  const agents = data.agents || [];
+  const total = projects.length;
+  const lixiang = projects.filter(p => p.status === "立项").length;
+  const doing = projects.filter(p => p.status === "进行中").length;
+  const feiqi = projects.filter(p => p.status === "废弃").length;
+  document.getElementById("summary").innerHTML =
+    `<div class="chip">项目 <b>${total}</b></div>` +
+    `<div class="chip">已立项 <b>${lixiang}</b></div>` +
+    `<div class="chip">进行中 <b>${doing}</b></div>` +
+    `<div class="chip">已废弃 <b>${feiqi}</b></div>` +
+    `<div class="chip">机器人 <b>${agents.length}</b></div>`;
+
+  document.getElementById("projects").innerHTML = projects.map(p => {
+    const pct = stages.length ? Math.round((p.progress || 0) / stages.length * 100) : 0;
+    const tl = p.timeline || [];
+    const tlHtml = tl.length
+      ? tl.map(t => `<div class="tl-item"><span class="time">${esc(t.time)}</span><span class="who">${esc(t.agent)} → ${esc(t.to)}</span><div class="txt">${esc(t.conclusion)}</div></div>`).join("")
+      : `<div class="empty-detail">暂无动态</div>`;
+    return `<div class="card" onclick="toggle(this)">
+      <div class="card-top">
+        <div>
+          <div class="card-title">${esc(p.name)}</div>
+          ${p.market ? `<div class="card-market">${esc(p.market)}</div>` : ""}
+        </div>
+        <span class="badge ${esc(p.status)}">${esc(p.status)}</span>
+      </div>
+      <div class="progress">
+        <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="progress-label"><span>${p.progress||0}/${stages.length} 环节</span><span>${pct}%</span></div>
+      </div>
+      ${p.note ? `<div class="note">${esc(p.note)}</div>` : ""}
+      <div class="detail">
+        <div class="detail-title">📋 项目动态（${tl.length} 条）</div>
+        <div class="tl">${tlHtml}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  document.getElementById("agents").innerHTML = agents.map(a => {
+    const hist = a.history || [];
+    const histHtml = hist.length
+      ? hist.map(h => `<div class="hist-item"><span class="time">${esc(h.time)}</span><span class="proj">${esc(h.project)}</span><div class="txt">→ ${esc(h.to)}：${esc(h.conclusion)}</div></div>`).join("")
+      : `<div class="empty-detail">暂无工作记录</div>`;
+    return `<div class="card" onclick="toggle(this)">
+      <div class="agent-head">
+        <div class="avatar">${a.emoji || "🤖"}</div>
+        <div>
+          <div class="agent-name">${esc(a.name)}</div>
+          <div class="agent-role">${esc(a.role)}</div>
+        </div>
+        <span class="badge ${esc(a.status)}" style="margin-left:auto">${esc(a.status)}</span>
+      </div>
+      <div class="agent-current">${esc(a.current)}</div>
+      <div class="agent-project">项目：${esc(a.project)}</div>
+      <div class="detail">
+        <div class="detail-title">🗂 工作记录（${hist.length} 条）</div>
+        <div class="hist">${histHtml}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  document.getElementById("updated").textContent = `数据更新于 ${fmtTime(data.updated_at)} · 每 5 分钟自动刷新`;
+}
+load();
+</script>
+</body>
+</html>
